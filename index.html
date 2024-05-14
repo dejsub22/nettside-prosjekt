@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Værmelding</title>
+    <style>
+        body {
+            background-color: #333;
+            font-family: 'Raleway', sans-serif;
+            color: #fff;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+            height: 100vh;
+            margin: 0;
+        }
+        nav {
+            background-color: #444;
+            width: 100%;
+            padding: 10px 0;
+            text-align: center;
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+        }
+        nav a {
+            color: #fff;
+            text-decoration: none;
+            margin: 0 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        nav a:hover {
+            color: #ccc;
+        }
+        #title {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+        }
+        #city-select-box {
+            margin-bottom: 450px;
+        }
+        #forecast-box {
+            position: absolute;
+            top: 200px; 
+            z-index: 1;
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            width: 600px;
+            color: #000;
+            overflow-x: auto;
+            white-space: nowrap;
+            margin-bottom: 20px;
+            text-align: center; 
+        }
+        .forecast-item {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        .forecast-item p {
+            margin: 0; 
+            font-size: 14px;
+        }
+        #weather-box {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            width: 300px;
+            color: #000;
+            text-align: center;
+            margin-right: auto;
+            margin-left: 20px;
+            position: absolute;
+            top: 150px; 
+            left: 1px;
+        }
+        select {
+            margin-bottom: 20px;
+        }   
+        h1, label {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        #weather-box h2 {
+            color: #000;
+            text-align: center;
+        }
+        #clock {
+            position: fixed;
+            bottom: 10px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            color: #fff; 
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="main.html">Hjem</a>
+        <a href="info.html">Info</a>
+        <a href="https://github.com/dejsub22">GitHub</a>
+    </nav>
+
+    <div id="weather-box">
+        <h2>Dagens værmelding</h2>
+        <div id="weather-info"></div>
+    </div>
+
+    <label for="city-select">Velg by:</label>
+    <div id="city-select-box">
+        <select id="city-select" onchange="fetchWeather()">
+            <option value="Skien">Skien</option>
+            <option value="Stavanger">Stavanger</option>
+            <option value="Oslo">Oslo</option>
+            <option value="Alta">Alta</option>
+        </select>
+    </div>
+
+    <div id="forecast-box">
+        <h2>Langtidsvarsel</h2>
+        <div id="forecast-info"></div>
+    </div>
+
+    <script>
+        const apiKey = 'x';
+        let selectedCity = 'Skien';
+
+        async function fetchForecast() {
+            try {
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${selectedCity}&appid=${apiKey}&units=metric`);
+                const data = await response.json();
+
+
+                const today = new Date();
+
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const nextWeek = new Date(today);
+                nextWeek.setDate(nextWeek.getDate() + 7);
+
+                const filteredForecast = data.list.filter(forecast => {
+                    const forecastDate = new Date(forecast.dt * 1000);
+                    return forecastDate >= tomorrow && forecastDate < nextWeek;
+                });
+
+                displayForecast(filteredForecast);
+            } catch (error) {
+                console.error('Feil ved henting av værmelding:', error);
+            }
+        }
+        
+
+        function displayForecast(data) {
+            const forecastInfoDiv = document.getElementById('forecast-info');
+            forecastInfoDiv.innerHTML = ''; 
+
+            const dailyData = {};
+
+            data.forEach(forecast => {
+                const date = new Date(forecast.dt * 1000);
+                const dayKey = date.toLocaleDateString('nb-NO', { weekday: 'long' });
+                const description = forecast.weather[0].description;
+                const minTemperature = Math.round(forecast.main.temp_min); // sett in min temperatur
+                const maxTemperature = Math.round(forecast.main.temp_max); // her går maks temperatur
+
+                if (!dailyData[dayKey]) {
+                    dailyData[dayKey] = {
+                        descriptions: [description],
+                        minTemperature: minTemperature,
+                        maxTemperature: maxTemperature
+                    };
+                } else {
+                    dailyData[dayKey].descriptions.push(description);
+                    dailyData[dayKey].minTemperature = Math.min(dailyData[dayKey].minTemperature, minTemperature);
+                    dailyData[dayKey].maxTemperature = Math.max(dailyData[dayKey].maxTemperature, maxTemperature);
+                }
+            });
+
+            Object.keys(dailyData).forEach(dayKey => {
+                const descriptions = dailyData[dayKey].descriptions;
+                const minTemperature = dailyData[dayKey].minTemperature;
+                const maxTemperature = dailyData[dayKey].maxTemperature;
+                
+                const mostCommonDescription = findMostCommonElement(descriptions);
+
+                const forecastHTML = `
+                    <div class="forecast-item">
+                        <p>${dayKey}</p>
+                        <p>${maxTemperature} / ${minTemperature}°C</p>
+                        <p>${mostCommonDescription}</p>
+                    </div>
+                `;
+
+                forecastInfoDiv.innerHTML += forecastHTML;
+            });
+        }
+
+        function findMostCommonElement(arr) {
+            const frequencyMap = {};
+            let maxFrequency = 0;
+            let mostCommonElement;
+
+            arr.forEach(element => {
+                frequencyMap[element] = (frequencyMap[element] || 0) + 1;
+                if (frequencyMap[element] > maxFrequency) {
+                    maxFrequency = frequencyMap[element];
+                    mostCommonElement = element;
+                }
+            });
+
+            return mostCommonElement;
+        }
+
+        async function fetchWeather() {
+            try {
+                selectedCity = document.getElementById('city-select').value;
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${selectedCity}&appid=${apiKey}&units=metric`);
+                const data = await response.json();
+                displayWeather(data);
+                fetchForecast();
+            } catch (error) {
+                console.error('Feil ved henting av værdata:', error);
+            }
+        }
+
+        function displayWeather(data) {
+            const weatherInfoDiv = document.getElementById('weather-info');
+            const temperature = Math.round(data.main.temp);
+            const description = data.weather[0].description;
+            const humidity = data.main.humidity;
+            const windSpeed = data.wind.speed; 
+
+            const body = document.querySelector('body');
+            if (isBadWeather(description)) {
+                body.style.backgroundImage = "url('https://img1.picmix.com/output/stamp/normal/7/0/7/9/1289707_8ce9c.gif')";
+            } else {
+                body.style.backgroundImage = "url('existing-background-image-url')";
+            }
+
+            weatherInfoDiv.innerHTML = `
+                <p>By: ${selectedCity}</p>
+                <p>Temperatur: ${temperature}°C</p>
+                <p>Vær: ${description}</p>
+                <p>Vindhastighet: ${windSpeed} m/s</p> 
+                <p>Fuktighet: ${humidity}%</p>
+            `;
+        }
+
+        function isBadWeather(description) {
+            const badWeatherDescriptions = ['Thunderstorm', 'Drizzle', 'Rain', 'Snow'];
+            return badWeatherDescriptions.includes(description);
+        }
+
+        window.onload = function() {
+            fetchWeather();
+            setInterval(updateClock, 60000);
+            updateClock();
+        };
+
+        function updateClock() {
+            const now = new Date();
+            const options = { timeZone: 'Europe/Oslo', hour12: false, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+            const formattedDate = now.toLocaleDateString('nb-NO', options); 
+            document.getElementById('clock').textContent = formattedDate;
+        }
+    </script>
+
+     <div id="clock"></div>
+
+</body>
+</html>
